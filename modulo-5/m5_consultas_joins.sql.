@@ -1,0 +1,70 @@
+-- Pre-entrega 5: Consultas con JOIN y UNION
+-- DE: Pilar Balor
+
+-- Consulta 1: Vista base del proyecto (INNER JOIN)
+-- Propósito: reunir en una sola tabla cada venta con su cliente, producto y categoría, como fuente para Power BI.
+
+SELECT ventas.fecha_venta,
+       clientes.nombre,
+       productos.nombre_producto,
+       categorias.nombre_categoria,
+       clientes.ciudad,
+       ventas.cantidad,
+       ventas.precio_unitario,
+       ventas.cantidad * ventas.precio_unitario AS total_venta
+FROM ventas
+INNER JOIN clientes ON ventas.id_cliente = clientes.id_cliente
+INNER JOIN productos ON ventas.id_producto = productos.id_producto
+INNER JOIN categorias ON productos.id_categoria = categorias.id_categoria;
+
+-- Hallazgo: Computación aparece en 4 de las 10 ventas pero concentra el 77% de la facturación ($4950).
+-- Accesorios tiene 3 ventas, pero son las más chicas del mes (entre $140 y $380).
+
+ -- Consulta 2: Clientes sin ventas (LEFT JOIN)
+-- Propósito: detectar clientes registrados que nunca compraron, para que CRM los contacte.
+
+SELECT clientes.nombre,
+       clientes.email,
+       clientes.fecha_registro
+FROM clientes
+LEFT JOIN ventas ON clientes.id_cliente = ventas.id_cliente
+WHERE ventas.id_venta IS NULL;
+
+-- Hallazgo: 0 de los 5 clientes registrados nunca compraron. Toda la base está activa,
+-- así que CRM no necesita campañas de reactivación: puede enfocarse en fidelizar a los que ya compran.
+
+-- Consulta 3: Productos sin ventas (LEFT JOIN)
+-- Propósito: detectar productos del catálogo sin movimiento, para que el área de producto revise su catálogo
+
+SELECT productos.nombre_producto,
+       categorias.nombre_categoria,
+       precio
+FROM productos
+INNER JOIN categorias ON productos.id_categoria = categorias.id_categoria
+LEFT JOIN ventas ON productos.id_producto = ventas.id_producto
+WHERE ventas.id_venta IS NULL;
+
+-- Hallazgo: 0 de los 6 productos del catálogo quedaron sin ventas. Todo el catálogo tuvo movimiento en marzo,
+-- así que producto no necesita dar de baja artículos, aunque Accesorios es la categoría que menos factura.
+
+-- Consulta 4: Consolidado por período (UNION ALL)
+-- Propósito: comparar cuánto se vendió en la primera y en la segunda mitad de marzo.
+
+SELECT periodo, SUM(total) AS total_periodo
+FROM (
+SELECT fecha_venta,
+       cantidad * precio_unitario AS total,
+       'Primera mitad' AS periodo
+FROM ventas
+WHERE fecha_venta <= '2024-03-10'
+UNION ALL 
+SELECT fecha_venta,
+       cantidad * precio_unitario AS total,
+       'Segunda mitad' AS periodo
+FROM ventas
+WHERE fecha_venta >= '2024-03-11'
+) AS consolidado
+GROUP BY periodo;
+
+-- Hallazgo: la primera mitad de marzo facturó $3620 y la segunda $2824, una caída del 22%.
+-- Gran parte de la diferencia se explica por una sola venta: las 2 laptops del 5 de marzo ($2400).
